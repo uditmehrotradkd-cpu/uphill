@@ -21,7 +21,7 @@ from uphill.agent.stock_agent import inline_refs
 from uphill.news.analysis import SymbolTagger, sentiment
 from uphill.news.models import NewsItem, item_id
 from uphill.news.service import NewsService
-from uphill.news.sources import parse_gdelt, parse_rss, parse_upstox_news, safe_url
+from uphill.news.sources import google_publisher, parse_gdelt, parse_rss, parse_upstox_news, safe_url
 from uphill.server import create_app
 from uphill.settings import UpHillSettings
 from uphill.state import Session, SessionStore, UpHillState
@@ -113,6 +113,34 @@ def test_news_service_isolates_failures_dedupes_and_pulses() -> None:
     assert (pulse["NSE:INFY"].articles, pulse["NSE:INFY"].bullish, pulse["NSE:INFY"].bearish) == (2, 1, 1)
     assert pulse["NSE:TCS"].articles == 0 and pulse["NSE:TCS"].label == "neutral"
     assert news.latest(sentiment_label="bearish")[0].url == "https://a/2"
+
+
+def test_google_publisher_moves_suffix_out_of_title() -> None:
+    item = google_publisher(_item("Sensex jumps 483 points - Business Standard", "https://g/1", NOW))
+    assert (item.title, item.publisher) == ("Sensex jumps 483 points", "Business Standard")
+    assert google_publisher(_item("No suffix here", "https://g/2", NOW)).publisher == "T"
+
+
+def test_news_search_tags_listing_merges_and_respects_ttl() -> None:
+    clock = [NOW]
+    calls: list[str] = []
+
+    async def searcher(listing: str) -> list[NewsItem]:
+        calls.append(listing)
+        return [_item("Company wins large order", f"https://s/{len(calls)}", clock[0] - timedelta(minutes=5))]
+
+    news = NewsService({}, SymbolTagger({}), searcher=searcher, search_ttl=timedelta(minutes=5),
+                       clock=lambda: clock[0])
+    assert asyncio.run(news.search("NSE:TCS")) == 1
+    assert asyncio.run(news.search("NSE:TCS")) == 0 and calls == ["NSE:TCS"]  # cached within TTL
+    assert news.latest(symbol="NSE:TCS")[0].sentiment_label == "bullish"
+    clock[0] += timedelta(minutes=6)
+    assert asyncio.run(news.search("NSE:TCS")) == 1 and len(news.latest(symbol="NSE:TCS")) == 2
+
+    async def failing(listing: str) -> list[NewsItem]:
+        raise RuntimeError("google down")
+
+    assert asyncio.run(NewsService({}, SymbolTagger({}), searcher=failing).search("NSE:TCS")) == 0
 
 
 def test_inline_refs_removes_json_schema_references() -> None:

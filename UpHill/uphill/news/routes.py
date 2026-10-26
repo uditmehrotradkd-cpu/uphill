@@ -24,6 +24,8 @@ async def news(
     tagged: Annotated[list[str] | None, Query(max_length=50, description="any of these listings")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 60,
 ) -> list[NewsItem]:
+    if symbol:
+        await state.news.search(symbol)
     return state.news.latest(category=category, symbol=symbol, query=q, sentiment_label=sentiment,
                              any_of=[s for s in tagged or [] if _LISTING_RE.fullmatch(s)], limit=limit)
 

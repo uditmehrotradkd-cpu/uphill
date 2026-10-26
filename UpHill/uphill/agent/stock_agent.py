@@ -80,6 +80,7 @@ class UpHillStockAgent(MarketAgent):
         async def stock_news(a: NewsArgs) -> ToolOutput:
             sec, as_of = await self._security(a)
             listing = f"{sec.exchange.value}:{sec.symbol}"
+            await self._news.search(listing)
             pulse = self._news.pulse([listing], hours=a.hours)[listing]
             note = f"{pulse.articles} tagged articles in {a.hours}h: {pulse.bullish} bullish, {pulse.bearish} bearish"
             facts = [Datum(
@@ -87,9 +88,11 @@ class UpHillStockAgent(MarketAgent):
                 source="UPHILL_NEWS", confidence_score=NEWS_CONFIDENCE, timestamp=self._news.updated,
                 provenance="uphill.news.analysis.sentiment (lexicon, -1 bearish..+1 bullish)", note=note)]
             ctx = self._sec_context(sec, as_of) | {
-                "stock_headlines": _headlines(self._news.latest(symbol=listing, limit=8)),
-                "world_headlines": _headlines(self._news.latest(category="world", limit=5)),
-                "news_basis": "live news desk (Upstox, GDELT, RSS); not point-in-time",
+                "stock_headlines": _headlines(self._news.latest(symbol=listing, limit=15)),
+                "world_headlines": _headlines(self._news.latest(category="world", limit=8)),
+                "market_headlines": _headlines(self._news.latest(category="markets", limit=8)),
+                "news_basis": "live news desk (Upstox, GDELT, 18 RSS feeds, on-demand Google News search for this "
+                              "company); not point-in-time",
             }
             return ToolOutput(context=ctx, facts=facts)
 

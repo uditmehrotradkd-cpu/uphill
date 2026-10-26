@@ -23,6 +23,7 @@ from uphill.news.models import Category, NewsItem, item_id
 log = logging.getLogger(__name__)
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
+GOOGLE_NEWS_SEARCH = "https://news.google.com/rss/search"
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) UpHill/0.1"
 _TAG = re.compile(r"<[^>]+>")
 _SPACE = re.compile(r"\s+")
@@ -169,4 +170,23 @@ def parse_rss(xml: bytes, publisher: str, category: Category, now: datetime) -> 
 
 async def fetch_rss(http: HttpFetcher, url: str, publisher: str, category: Category) -> list[NewsItem]:
     response = await http.get(url, headers={"User-Agent": BROWSER_UA, "Accept": "application/rss+xml, */*"})
-    return parse_rss(response.content, publisher, category, datetime.now(UTC))
+    items = parse_rss(response.content, publisher, category, datetime.now(UTC))
+    return [google_publisher(i) for i in items] if urlsplit(url).hostname == "news.google.com" else items
+
+
+# -------------------------------------------------------------------------------------- Google News
+def google_publisher(item: NewsItem) -> NewsItem:
+    """Google News titles end with ' - Publisher'; move it to ``publisher``."""
+    title, sep, publisher = item.title.rpartition(" - ")
+    if not sep or not title or not publisher or len(publisher) > 60:
+        return item
+    return item.model_copy(update={"title": title, "publisher": publisher})
+
+
+async def search_google_news(http: HttpFetcher, query: str, *, india: bool = True, days: int = 3,
+                             category: Category = "stock") -> list[NewsItem]:
+    locale = {"hl": "en-IN", "gl": "IN", "ceid": "IN:en"} if india else {"hl": "en-US", "gl": "US", "ceid": "US:en"}
+    response = await http.get(GOOGLE_NEWS_SEARCH, params={"q": f"{query} when:{days}d", **locale},
+                              headers={"User-Agent": BROWSER_UA, "Accept": "application/rss+xml, */*"})
+    items = parse_rss(response.content, "Google News", category, datetime.now(UTC))
+    return [google_publisher(i).model_copy(update={"source": "Google News"}) for i in items]

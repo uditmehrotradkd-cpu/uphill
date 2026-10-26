@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import get_args
 
@@ -14,15 +14,20 @@ from uphill.news.models import Category, NewsItem, SourceStatus, SymbolPulse
 log = logging.getLogger(__name__)
 
 Fetcher = Callable[[], Awaitable[list[NewsItem]]]
+Searcher = Callable[[str], Awaitable[list[NewsItem]]]  # listing -> fresh headlines about it
 CATEGORIES: tuple[str, ...] = get_args(Category)
 
 
 class NewsService:
     def __init__(self, sources: Mapping[str, Fetcher], tagger: SymbolTagger, *, max_items: int = 600,
+                 searcher: Searcher | None = None, search_ttl: timedelta = timedelta(minutes=5),
                  clock: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
         self._sources = dict(sources)
         self._tagger = tagger
         self._max = max_items
+        self._searcher = searcher
+        self._search_ttl = search_ttl
+        self._searched: dict[str, datetime] = {}
         self._clock = clock
         self._items: dict[str, NewsItem] = {}
         self.status: dict[str, SourceStatus] = {name: SourceStatus(name=name, ok=False) for name in sources}
@@ -50,21 +55,41 @@ class NewsService:
         """Returns the number of new articles."""
         async with self._lock:
             batches = await asyncio.gather(*(self._run_source(n, f) for n, f in self._sources.items()))
-            added = 0
-            for batch in batches:
-                for raw in batch:
-                    item = self._enrich(raw)
-                    prev = self._items.get(item.id)
-                    if prev is None:
-                        added += 1
-                    elif prev.symbols != item.symbols:
-                        item = item.model_copy(update={"symbols": sorted({*prev.symbols, *item.symbols})})
-                    self._items[item.id] = item
-            if len(self._items) > self._max:
-                keep = sorted(self._items.values(), key=lambda i: i.published, reverse=True)[: self._max]
-                self._items = {i.id: i for i in keep}
+            added = self._merge(item for batch in batches for item in batch)
             self.updated = self._clock()
             return added
+
+    async def search(self, listing: str) -> int:
+        """Pull fresh headlines for one listing into the desk (at most once per TTL); returns new articles."""
+        now = self._clock()
+        last = self._searched.get(listing)
+        if self._searcher is None or (last is not None and now - last < self._search_ttl):
+            return 0
+        if len(self._searched) > 5000:
+            self._searched.clear()
+        self._searched[listing] = now
+        try:
+            found = await self._searcher(listing)
+        except Exception as exc:  # search is best-effort; the periodic desk still answers
+            log.warning("news search for %s failed: %s", listing, exc)
+            return 0
+        async with self._lock:
+            return self._merge(i.model_copy(update={"symbols": sorted({*i.symbols, listing})}) for i in found)
+
+    def _merge(self, raw_items: Iterable[NewsItem]) -> int:
+        added = 0
+        for raw in raw_items:
+            item = self._enrich(raw)
+            prev = self._items.get(item.id)
+            if prev is None:
+                added += 1
+            elif prev.symbols != item.symbols:
+                item = item.model_copy(update={"symbols": sorted({*prev.symbols, *item.symbols})})
+            self._items[item.id] = item
+        if len(self._items) > self._max:
+            keep = sorted(self._items.values(), key=lambda i: i.published, reverse=True)[: self._max]
+            self._items = {i.id: i for i in keep}
+        return added
 
     async def run(self, interval_seconds: float) -> None:
         while True:

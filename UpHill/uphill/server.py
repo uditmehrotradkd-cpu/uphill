@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from functools import partial
 from pathlib import Path
 from typing import cast
@@ -41,7 +42,7 @@ from uphill.news import routes as news_routes
 from uphill.news.analysis import SymbolTagger
 from uphill.news.models import Category, NewsItem
 from uphill.news.service import CATEGORIES, Fetcher, NewsService
-from uphill.news.sources import fetch_gdelt, fetch_rss, fetch_upstox_news
+from uphill.news.sources import fetch_gdelt, fetch_rss, fetch_upstox_news, search_google_news
 from uphill.settings import UpHillSettings
 from uphill.state import Session, SessionStore, UpHillState
 from uphill.terminal import routes as terminal_routes
@@ -116,8 +117,22 @@ async def _runtime(app: FastAPI, settings: Settings, uphill: UpHillSettings) -> 
         for listing, names in uphill.news_aliases.items():
             aliases[listing] = sorted({*aliases.get(listing, []), *names})
         news_listings = list(dict.fromkeys([*watchlist, *((Exchange.NSE, s.symbol) for s in universe)]))
+        company = {s.listing: names[0] for s in universe if (names := universe_aliases(s))}
+        company |= {k: v[0] for k, v in uphill.news_aliases.items() if v and k not in company}
+        company |= {f"{e.value}:{s}": s for e, s in watchlist if f"{e.value}:{s}" not in company}
+        search_http = HttpFetcher(client, rate_per_second=1, max_retries=1)
+
+        async def search_listing(listing: str) -> list[NewsItem]:
+            name = company.get(listing)
+            if name is None:  # public endpoint: never turn arbitrary input into outbound searches
+                return []
+            exchange = listing.partition(":")[0]
+            india = exchange in (Exchange.NSE.value, Exchange.BSE.value)
+            return await search_google_news(search_http, f'"{name}"' if india else f'"{name}" stock', india=india)
+
         news = NewsService(news_sources(settings, uphill, client, news_listings), SymbolTagger(aliases),
-                           max_items=uphill.news_max_items)
+                           max_items=uphill.news_max_items, searcher=search_listing,
+                           search_ttl=timedelta(seconds=uphill.news_search_ttl_seconds))
         screener = Screener(workspace, universe, clock=workspace.clock)
         enabled = agent_enabled(settings)
 

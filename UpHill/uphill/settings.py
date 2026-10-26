@@ -7,11 +7,25 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_RSS_FEEDS: dict[str, str] = {
     "ET Markets|markets": "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
+    "ET Stocks|stock": "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
+    "ET Economy|business": "https://economictimes.indiatimes.com/news/economy/rssfeeds/1373380680.cms",
     "Livemint Markets|markets": "https://www.livemint.com/rss/markets",
-    "Moneycontrol|markets": "https://www.moneycontrol.com/rss/latestnews.xml",
+    "Livemint Companies|stock": "https://www.livemint.com/rss/companies",
+    "Livemint Economy|business": "https://www.livemint.com/rss/economy",
+    "Business Standard Markets|markets": "https://www.business-standard.com/rss/markets-106.rss",
+    "Business Standard Companies|stock": "https://www.business-standard.com/rss/companies-101.rss",
+    "BusinessLine Markets|markets": "https://www.thehindubusinessline.com/markets/feeder/default.rss",
+    "Google News India Markets|markets":
+        "https://news.google.com/rss/search?q=Sensex+OR+Nifty+OR+%22stock+market%22+when:1d&hl=en-IN&gl=IN&ceid=IN:en",
+    "Google News Business|business":
+        "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-IN&gl=IN&ceid=IN:en",
+    "Google News World|world": "https://news.google.com/rss/headlines/section/topic/WORLD?hl=en-IN&gl=IN&ceid=IN:en",
     "BBC Business|business": "https://feeds.bbci.co.uk/news/business/rss.xml",
     "BBC World|world": "https://feeds.bbci.co.uk/news/world/rss.xml",
     "CNBC World|world": "https://www.cnbc.com/id/100727362/device/rss/rss.html",
+    "CNBC Economy|business": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    "MarketWatch|business": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+    "Al Jazeera|world": "https://www.aljazeera.com/xml/rss/all.xml",
 }
 
 DEFAULT_ALIASES: dict[str, list[str]] = {
@@ -45,8 +59,10 @@ class UpHillSettings(BaseSettings):
     max_sessions: int = Field(default=200, ge=1)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 
-    news_refresh_seconds: int = Field(default=300, ge=60)
-    news_max_items: int = Field(default=600, ge=50)
+    news_refresh_seconds: int = Field(default=120, ge=60)
+    news_max_items: int = Field(default=3000, ge=50)
+    # On-demand Google News search per listing (agent questions, News page symbol filter); cached this long.
+    news_search_ttl_seconds: int = Field(default=300, ge=60)
     # "Name|category" -> RSS/Atom URL
     news_rss_feeds: dict[str, str] = Field(default_factory=lambda: dict(DEFAULT_RSS_FEEDS))
     news_gdelt_query: str = (
