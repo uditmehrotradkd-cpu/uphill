@@ -218,8 +218,11 @@ function sessionId(): string {
 
 export const SESSION_ID = sessionId();
 
+// Empty when the backend serves this UI; set VITE_API_BASE (e.g. https://uphill-api.onrender.com) for a separate host.
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(API_BASE + path, {
     ...init,
     headers: { "Content-Type": "application/json", "X-Session-Id": SESSION_ID, ...(init?.headers ?? {}) },
   });
@@ -262,6 +265,7 @@ export const api = {
 };
 
 export function marketSocketUrl(symbols: string[]): string {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  return `${proto}://${location.host}/ws/market?symbols=${encodeURIComponent(symbols.join(","))}`;
+  const base = new URL(API_BASE || location.origin);
+  const proto = base.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${base.host}/ws/market?symbols=${encodeURIComponent(symbols.join(","))}`;
 }

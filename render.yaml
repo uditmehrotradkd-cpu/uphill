@@ -1,0 +1,61 @@
+# Render Blueprint: UpHill backend (+ UI) with Postgres/TimescaleDB and Key Value (Redis).
+services:
+  - type: web
+    name: uphill-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: QT_DATABASE_URL
+        fromDatabase:
+          name: uphill-db
+          property: connectionString
+      - key: QT_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: uphill-redis
+          property: connectionString
+      - key: QT_API_TOKEN
+        generateValue: true
+      - key: QT_INGEST_TOKEN
+        generateValue: true
+      - key: QT_AGENT_API_KEY
+        sync: false
+      - key: QT_UPSTOX_ANALYTICS_TOKEN
+        sync: false
+      - key: QT_DB_POOL_MIN
+        value: "1"
+      - key: QT_DB_POOL_MAX
+        value: "5"
+      - key: QT_BETA_BENCHMARKS
+        value: '{"US":"NYSE:SPY","IN":"NSE:NIFTY"}'
+      - key: QT_UPSTOX_SYMBOLS
+        value: '["NSE:RELIANCE","NSE:TCS","NSE:INFY","NSE:HDFCBANK","NSE:ICICIBANK"]'
+      - key: QT_WATCHLIST
+        value: '["NSE:RELIANCE","NSE:TCS","NSE:INFY","NSE:HDFCBANK","NSE:ICICIBANK"]'
+      - key: QT_AGENT_BASE_URL
+        value: https://generativelanguage.googleapis.com/v1beta/openai
+      - key: QT_AGENT_MODEL
+        value: gemini-3.5-flash
+      - key: QT_AGENT_REASONING_EFFORT
+        value: low
+      - key: QT_AGENT_FALLBACK_MODELS
+        value: '["gemini-3-flash-preview","gemini-3.5-flash-lite","gemini-3.1-flash-lite"]'
+      - key: UPHILL_CORS_ORIGINS
+        value: '["https://uphill-two.vercel.app"]'
+
+  - type: keyvalue
+    name: uphill-redis
+    plan: free
+    region: singapore
+    ipAllowList: []
+
+databases:
+  - name: uphill-db
+    plan: free
+    region: singapore
+    postgresMajorVersion: "16"
+    databaseName: quantterm
+    user: quantterm

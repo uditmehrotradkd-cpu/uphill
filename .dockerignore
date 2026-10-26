@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.venv
+.vscode
+.mypy_cache
+.pytest_cache
+**/__pycache__
+**/node_modules
+**/dist
+**/.vercel
+tests
+*.new

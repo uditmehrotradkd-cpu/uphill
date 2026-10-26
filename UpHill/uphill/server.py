@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from redis.asyncio import Redis
@@ -156,16 +157,20 @@ async def _runtime(app: FastAPI, settings: Settings, uphill: UpHillSettings) -> 
 
 def create_app(state: UpHillState | None = None, settings: Settings | None = None,
                uphill: UpHillSettings | None = None) -> FastAPI:
+    uphill = uphill or (state.uphill if state is not None else UpHillSettings())
+
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if state is not None:
             app.state.uphill = state
             yield
             return
-        async with _runtime(app, settings or Settings(), uphill or UpHillSettings()):
+        async with _runtime(app, settings or Settings(), uphill):
             yield
 
     app = FastAPI(title="UpHill", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(CORSMiddleware, allow_origins=uphill.cors_origins, allow_methods=["GET", "POST"],
+                       allow_headers=["Content-Type", "X-Session-Id"])
     for module in (market_routes, terminal_routes, agent_routes, news_routes):
         app.include_router(module.router)
 
