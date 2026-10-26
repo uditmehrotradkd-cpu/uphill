@@ -177,6 +177,7 @@ export interface LiveTick {
   price: number;
   size: number;
   timestamp: string;
+  prev_close?: number | null;
 }
 
 export type Cap = "large" | "mid" | "small";

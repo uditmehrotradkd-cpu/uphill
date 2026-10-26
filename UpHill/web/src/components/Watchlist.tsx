@@ -67,7 +67,8 @@ export function Watchlist({ rows, ticks, connection, feedOn, active, onSelect, o
         {rows.map((row, index) => {
           const tick = ticks[row.listing];
           const last = tick?.price ?? row.last_close ?? null;
-          const change = tick && row.last_close ? (tick.price / row.last_close - 1) * 100 : null;
+          const base = tick?.prev_close ?? row.last_close;
+          const change = tick && base ? (tick.price / base - 1) * 100 : null;
           return (
             <div
               key={row.listing}

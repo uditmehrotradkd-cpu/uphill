@@ -60,15 +60,22 @@ async def _snapshot(state: UpHillState, exchange: Exchange, symbol: str, live: s
     return row
 
 
+def _live(state: UpHillState) -> set[str]:
+    """Listings with live prices: streamed tick feeds plus the polled universe quotes."""
+    streamed = (set(state.settings.upstox_symbols) | set(state.settings.kite_symbols)) if state.live_feeds else set()
+    polled = set(state.quotes.quotes) if state.quotes is not None else set()
+    return streamed | polled
+
+
 @router.get("/api/market/overview")
 async def overview(
     state: State, symbols: Annotated[list[str] | None, Query(max_length=MAX_SYMBOLS)] = None,
 ) -> list[dict[str, Any]]:
     listings = _listings(symbols, state)
-    live = (set(state.settings.upstox_symbols) | set(state.settings.kite_symbols)) if state.live_feeds else set()
+    live = _live(state)
     rows = await asyncio.gather(*(_snapshot(state, e, s, live) for e, s in listings))
     pulses = state.news.pulse([r["listing"] for r in rows])
-    return [r | {"news": pulses[r["listing"]].model_dump(mode="json")} for r in rows]
+    return [r | {"live": r["listing"] in live, "news": pulses[r["listing"]].model_dump(mode="json")} for r in rows]
 
 
 @router.get("/api/market/screener")
@@ -78,7 +85,7 @@ async def screener(state: State) -> dict[str, Any]:
         return {"updated": None, "rows": []}
     rows = list(state.screener.rows.values())
     pulses = state.news.pulse([r["listing"] for r in rows])
-    live = set(state.settings.upstox_symbols) if state.live_feeds else set()
+    live = _live(state)
     return {
         "updated": state.screener.updated,
         "rows": [r | {"live": r["listing"] in live, "news": pulses[r["listing"]].model_dump(mode="json")}
@@ -91,6 +98,8 @@ async def market_status(state: State) -> dict[str, Any]:
     return {
         "live_feeds": state.live_feeds,
         "live_symbols": sorted(set(state.settings.upstox_symbols) | set(state.settings.kite_symbols)),
+        "live_quotes": len(state.quotes.quotes) if state.quotes else 0,
+        "live_quotes_updated": state.quotes.updated if state.quotes else None,
         "watchlist": [f"{e.value}:{s}" for e, s in state.watchlist],
         "agent_enabled": state.agent_enabled,
         "news_updated": state.news.updated,
@@ -112,6 +121,11 @@ async def market_stream(ws: WebSocket, symbols: str = "") -> None:
         # Subscribe before accepting so no tick published after the handshake can be missed.
         async with state.broker.subscribe(list(channels)) as messages:
             await ws.accept()
+            if state.quotes is not None:  # latest polled prices immediately, not after the next change
+                for listing in channels.values():
+                    if (q := state.quotes.quotes.get(listing)) is not None:
+                        await ws.send_json({"listing": listing, "price": q["price"], "size": 0,
+                                            "timestamp": q["timestamp"], "prev_close": q["prev_close"]})
 
             async def forward() -> None:
                 async for channel, data in messages:
@@ -119,8 +133,11 @@ async def market_stream(ws: WebSocket, symbols: str = "") -> None:
                     if listing is None:
                         continue
                     tick = json.loads(data)["tick"]
+                    prev = tick.get("prev_close")
+                    if prev is None and state.quotes is not None:  # streamed ticks: borrow the polled prev close
+                        prev = (state.quotes.quotes.get(listing) or {}).get("prev_close")
                     await ws.send_json({"listing": listing, "price": tick["price"], "size": tick["size"],
-                                        "timestamp": tick["timestamp"]})
+                                        "timestamp": tick["timestamp"], "prev_close": prev})
 
             # TaskGroup guarantees the forwarder never outlives the connection, including on cancellation.
             try:

@@ -109,6 +109,9 @@ class UpHillSettings(BaseSettings):
     # Load each trading day's NSE bhavcopy into raw_market_bars (catches up missed sessions on start).
     eod_update: bool = True
     eod_check_seconds: int = Field(default=1800, ge=300)
+    # Poll Upstox last-traded prices for every universe stock during NSE hours (needs QT_UPSTOX_ANALYTICS_TOKEN).
+    live_quotes: bool = True
+    live_quote_seconds: int = Field(default=15, ge=5)
     max_sessions: int = Field(default=200, ge=1)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 

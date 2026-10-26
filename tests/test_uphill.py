@@ -282,4 +282,4 @@ def test_market_websocket_forwards_validated_ticks(client: TestClient, broker: I
         assert broker._subscribers  # subscribed before the handshake completed
         client.portal.call(publish)  # type: ignore[union-attr]
         assert ws.receive_json() == {"listing": "NSE:INFY", "price": 1513.0, "size": 7,
-                                     "timestamp": "2026-10-26T04:00:00Z"}
+                                     "timestamp": "2026-10-26T04:00:00Z", "prev_close": None}

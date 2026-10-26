@@ -98,7 +98,7 @@ export function ScreenerPage({ watchlist, onOpenSecurity, onWatch }: Props) {
       inCap.map((r) => {
         const tick = ticks[r.listing];
         const price = tick?.price ?? r.last_close ?? null;
-        const base = tick ? r.last_close : r.prev_close;
+        const base = tick ? (tick.prev_close ?? r.last_close) : r.prev_close;
         const dayChg = tick && base ? (tick.price / base - 1) * 100 : (r.chg_1d ?? null);
         return { ...r, price, dayChg, tickTime: tick?.timestamp ?? null };
       }),

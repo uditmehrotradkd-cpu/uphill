@@ -38,6 +38,7 @@ from uphill.agent import routes as agent_routes
 from uphill.agent.stock_agent import UpHillStockAgent
 from uphill.market import routes as market_routes
 from uphill.market.eod import EodUpdater
+from uphill.market.quotes import LiveQuotePoller
 from uphill.market.screener import Screener
 from uphill.market.universe import load_universe
 from uphill.market.universe import news_aliases as universe_aliases
@@ -157,6 +158,11 @@ async def _runtime(app: FastAPI, settings: Settings, uphill: UpHillSettings) -> 
                                    NseBhavcopySource(HttpFetcher(client, rate_per_second=1)),
                                    on_update=screener.refresh)
             tasks.append(asyncio.create_task(state.eod.run(uphill.eod_check_seconds)))
+        if uphill.live_quotes and settings.upstox_analytics_token is not None:
+            nse = [s for e, s in watchlist if e is Exchange.NSE] + [s.symbol for s in universe]
+            state.quotes = LiveQuotePoller(HttpFetcher(client, rate_per_second=2), settings.upstox_analytics_token,
+                                           broker, nse, base_url=settings.upstox_base_url)
+            tasks.append(asyncio.create_task(state.quotes.run(uphill.live_quote_seconds)))
         pipeline = None
         if uphill.live_feed:
             pipeline = build_pipeline(settings, pool, broker)
