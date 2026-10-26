@@ -1,0 +1,19 @@
+{
+  "_instructions": "Fill from a Bloomberg Terminal to enable the parity tests (null = skipped). BETA <GO>: 2Y weekly, end 2024-12-31, benchmark SPX Index / NIFTY Index, raw and adjusted. EV: CURR_ENTP_VAL in local currency on 2024-09-27 (AAPL) / 2024-03-28 (RELIANCE); HDFCBANK: PX_TO_TANG_BV on 2024-03-28. OVME: the contracts and inputs defined in tests/test_accuracy_benchmark.py (OVME_CASES), vol/rate/yield overridden to the same values; theta per day, vega per vol point, rho per 1%.",
+  "tolerances": {"beta_abs": 0.05, "ev_rel": 0.02, "ptbv_rel": 0.03, "option_price_rel": 0.01, "greek_rel": 0.05},
+  "AAPL": {
+    "beta": {"raw": null, "adjusted": null},
+    "ev": {"enterprise_value": null},
+    "ovme": {"npv": null, "delta": null, "gamma": null, "theta_per_day": null, "vega_per_vol_point": null, "rho_per_pct": null}
+  },
+  "RELIANCE": {
+    "beta": {"raw": null, "adjusted": null},
+    "ev": {"enterprise_value": null},
+    "ovme": {"npv": null, "delta": null, "gamma": null, "theta_per_day": null, "vega_per_vol_point": null, "rho_per_pct": null}
+  },
+  "HDFCBANK": {
+    "beta": {"raw": null, "adjusted": null},
+    "ev": {"price_to_tangible_book": null},
+    "ovme": {"npv": null, "delta": null, "gamma": null, "theta_per_day": null, "vega_per_vol_point": null, "rho_per_pct": null}
+  }
+}

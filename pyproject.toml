@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "quantterm"
+version = "0.1.0"
+description = "Institutional-grade financial terminal core: PIT fundamentals, corporate actions, tick hygiene, street-convention analytics."
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "polars>=1.20",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "QuantLib>=1.33",
+    "pydantic-settings>=2.3",
+    "asyncpg>=0.30",
+    "redis>=5.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "websockets>=13.0",
+    "defusedxml>=0.7.1",
+    "tzdata>=2024.1",
+    "textual>=1.0",
+    "textual-plotext>=1.0",
+]
+
+[project.scripts]
+quantterm-terminal = "quantterm.terminal.app:main"
+uphill = "uphill.server:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "mypy>=1.10", "types-defusedxml>=0.7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quantterm", "UpHill/uphill"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "UpHill"]
+markers = ["integration: requires a live PostgreSQL/TimescaleDB (QT_TEST_DATABASE_URL)"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src,UpHill"
+
+[[tool.mypy.overrides]]
+module = ["QuantLib", "QuantLib.*", "scipy.*", "statsmodels.*", "asyncpg", "asyncpg.*"]
+ignore_missing_imports = true

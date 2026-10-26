@@ -1,0 +1,112 @@
+"""In-memory news desk: periodic refresh from every source, dedupe, listing tags, sentiment, per-listing pulse."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from datetime import UTC, datetime, timedelta
+from typing import get_args
+
+from uphill.news.analysis import SymbolTagger, label_for, sentiment
+from uphill.news.models import Category, NewsItem, SourceStatus, SymbolPulse
+
+log = logging.getLogger(__name__)
+
+Fetcher = Callable[[], Awaitable[list[NewsItem]]]
+CATEGORIES: tuple[str, ...] = get_args(Category)
+
+
+class NewsService:
+    def __init__(self, sources: Mapping[str, Fetcher], tagger: SymbolTagger, *, max_items: int = 600,
+                 clock: Callable[[], datetime] = lambda: datetime.now(UTC)) -> None:
+        self._sources = dict(sources)
+        self._tagger = tagger
+        self._max = max_items
+        self._clock = clock
+        self._items: dict[str, NewsItem] = {}
+        self.status: dict[str, SourceStatus] = {name: SourceStatus(name=name, ok=False) for name in sources}
+        self.updated: datetime | None = None
+        self._lock = asyncio.Lock()
+
+    def _enrich(self, item: NewsItem) -> NewsItem:
+        text = f"{item.title}. {item.summary}"
+        score, label = sentiment(text)
+        symbols = sorted({*item.symbols, *self._tagger.tag(text)})
+        return item.model_copy(update={"sentiment": round(score, 3), "sentiment_label": label, "symbols": symbols})
+
+    async def _run_source(self, name: str, fetch: Fetcher) -> list[NewsItem]:
+        try:
+            items = await fetch()
+        except Exception as exc:  # one failing feed must not blank the desk
+            log.warning("news source %s failed: %s", name, exc)
+            self.status[name] = SourceStatus(name=name, ok=False, error=f"{type(exc).__name__}: {exc}"[:200],
+                                             checked=self._clock())
+            return []
+        self.status[name] = SourceStatus(name=name, ok=True, items=len(items), checked=self._clock())
+        return items
+
+    async def refresh(self) -> int:
+        """Returns the number of new articles."""
+        async with self._lock:
+            batches = await asyncio.gather(*(self._run_source(n, f) for n, f in self._sources.items()))
+            added = 0
+            for batch in batches:
+                for raw in batch:
+                    item = self._enrich(raw)
+                    prev = self._items.get(item.id)
+                    if prev is None:
+                        added += 1
+                    elif prev.symbols != item.symbols:
+                        item = item.model_copy(update={"symbols": sorted({*prev.symbols, *item.symbols})})
+                    self._items[item.id] = item
+            if len(self._items) > self._max:
+                keep = sorted(self._items.values(), key=lambda i: i.published, reverse=True)[: self._max]
+                self._items = {i.id: i for i in keep}
+            self.updated = self._clock()
+            return added
+
+    async def run(self, interval_seconds: float) -> None:
+        while True:
+            try:
+                added = await self.refresh()
+                log.info("news refreshed: %d new, %d total", added, len(self._items))
+            except Exception:
+                log.exception("news refresh failed")
+            await asyncio.sleep(interval_seconds)
+
+    def latest(self, *, category: str | None = None, symbol: str | None = None, query: str | None = None,
+               sentiment_label: str | None = None, any_of: Sequence[str] = (), limit: int = 50) -> list[NewsItem]:
+        q = query.lower() if query else None
+        wanted = set(any_of)
+        out = []
+        for item in sorted(self._items.values(), key=lambda i: i.published, reverse=True):
+            if category and item.category != category:
+                continue
+            if symbol and symbol not in item.symbols:
+                continue
+            if wanted and wanted.isdisjoint(item.symbols):
+                continue
+            if sentiment_label and item.sentiment_label != sentiment_label:
+                continue
+            if q and q not in item.title.lower() and q not in item.summary.lower():
+                continue
+            out.append(item)
+            if len(out) >= limit:
+                break
+        return out
+
+    def pulse(self, listings: Sequence[str], hours: int = 72) -> dict[str, SymbolPulse]:
+        since = self._clock() - timedelta(hours=hours)
+        result = {}
+        for listing in listings:
+            tagged = [i for i in self._items.values() if listing in i.symbols and i.published >= since]
+            score = sum(i.sentiment for i in tagged) / len(tagged) if tagged else 0.0
+            result[listing] = SymbolPulse(
+                listing=listing, articles=len(tagged),
+                bullish=sum(i.sentiment_label == "bullish" for i in tagged),
+                bearish=sum(i.sentiment_label == "bearish" for i in tagged),
+                score=round(score, 3), label=label_for(score) if tagged else "neutral",
+                latest=max((i.published for i in tagged), default=None),
+            )
+        return result
