@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -170,7 +171,7 @@ def parse_rss(xml: bytes, publisher: str, category: Category, now: datetime) -> 
 
 async def fetch_rss(http: HttpFetcher, url: str, publisher: str, category: Category) -> list[NewsItem]:
     response = await http.get(url, headers={"User-Agent": BROWSER_UA, "Accept": "application/rss+xml, */*"})
-    items = parse_rss(response.content, publisher, category, datetime.now(UTC))
+    items = await asyncio.to_thread(parse_rss, response.content, publisher, category, datetime.now(UTC))
     return [google_publisher(i) for i in items] if urlsplit(url).hostname == "news.google.com" else items
 
 
@@ -188,5 +189,5 @@ async def search_google_news(http: HttpFetcher, query: str, *, india: bool = Tru
     locale = {"hl": "en-IN", "gl": "IN", "ceid": "IN:en"} if india else {"hl": "en-US", "gl": "US", "ceid": "US:en"}
     response = await http.get(GOOGLE_NEWS_SEARCH, params={"q": f"{query} when:{days}d", **locale},
                               headers={"User-Agent": BROWSER_UA, "Accept": "application/rss+xml, */*"})
-    items = parse_rss(response.content, "Google News", category, datetime.now(UTC))
+    items = await asyncio.to_thread(parse_rss, response.content, "Google News", category, datetime.now(UTC))
     return [google_publisher(i).model_copy(update={"source": "Google News"}) for i in items]

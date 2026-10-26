@@ -45,6 +45,9 @@ services:
         value: '["gemini-3-flash-preview","gemini-3.5-flash-lite","gemini-3.1-flash-lite"]'
       - key: UPHILL_CORS_ORIGINS
         value: '["https://uphill-two.vercel.app"]'
+      # Free plan has 0.1 CPU: refresh the 54-source desk less often than the 120 s default.
+      - key: UPHILL_NEWS_REFRESH_SECONDS
+        value: "300"
 
   - type: keyvalue
     name: uphill-redis

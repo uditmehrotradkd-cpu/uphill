@@ -47,19 +47,34 @@ def label_for(score: float) -> SentimentLabel:
     return "bullish" if score >= 0.2 else "bearish" if score <= -0.2 else "neutral"
 
 
+_TOKEN = re.compile(r"[A-Za-z0-9]+(?:[&.\-][A-Za-z0-9]+)*")
+
+
 class SymbolTagger:
-    """Tags text with EXCHANGE:SYMBOL listings by ticker (exact case) or company alias (case-insensitive)."""
+    """Tags text with EXCHANGE:SYMBOL listings by ticker (exact case) or company alias (case-insensitive).
+
+    Word n-gram dictionary lookups (not one regex per listing) keep tagging cheap for ~500 listings.
+    """
 
     def __init__(self, aliases: Mapping[str, Iterable[str]]) -> None:
-        self._patterns: list[tuple[str, re.Pattern[str]]] = []
+        self._tickers: dict[str, set[str]] = {}
+        self._aliases: dict[str, set[str]] = {}
+        self._max_words = 1
         for listing, names in aliases.items():
             ticker = listing.partition(":")[2]
-            parts = [re.escape(n) for n in names if n]
-            ticker_re = rf"\b{re.escape(ticker)}\b" if len(ticker) >= 3 else None
-            alias_re = rf"(?i:\b(?:{'|'.join(parts)})\b)" if parts else None
-            pattern = "|".join(p for p in (ticker_re, alias_re) if p)
-            if pattern:
-                self._patterns.append((listing, re.compile(pattern)))
+            if len(ticker) >= 3:
+                self._tickers.setdefault(ticker, set()).add(listing)
+            for name in names:
+                words = _TOKEN.findall(name)
+                if words:
+                    self._aliases.setdefault(" ".join(words).lower(), set()).add(listing)
+                    self._max_words = max(self._max_words, len(words))
 
     def tag(self, text: str) -> list[str]:
-        return [listing for listing, pattern in self._patterns if pattern.search(text)]
+        words = _TOKEN.findall(text)
+        found: set[str] = set()
+        for i, word in enumerate(words):
+            found |= self._tickers.get(word, set())
+            for n in range(1, min(self._max_words, len(words) - i) + 1):
+                found |= self._aliases.get(" ".join(words[i:i + n]).lower(), set())
+        return sorted(found)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import get_args
 
@@ -55,7 +55,7 @@ class NewsService:
         """Returns the number of new articles."""
         async with self._lock:
             batches = await asyncio.gather(*(self._run_source(n, f) for n, f in self._sources.items()))
-            added = self._merge(item for batch in batches for item in batch)
+            added = await self._merge([item for batch in batches for item in batch])
             self.updated = self._clock()
             return added
 
@@ -74,22 +74,23 @@ class NewsService:
             log.warning("news search for %s failed: %s", listing, exc)
             return 0
         async with self._lock:
-            return self._merge(i.model_copy(update={"symbols": sorted({*i.symbols, listing})}) for i in found)
+            return await self._merge([i.model_copy(update={"symbols": sorted({*i.symbols, listing})}) for i in found])
 
-    def _merge(self, raw_items: Iterable[NewsItem]) -> int:
-        added = 0
+    async def _merge(self, raw_items: list[NewsItem]) -> int:
+        fresh: dict[str, NewsItem] = {}
         for raw in raw_items:
-            item = self._enrich(raw)
-            prev = self._items.get(item.id)
+            prev = self._items.get(raw.id)
             if prev is None:
-                added += 1
-            elif prev.symbols != item.symbols:
-                item = item.model_copy(update={"symbols": sorted({*prev.symbols, *item.symbols})})
-            self._items[item.id] = item
+                fresh.setdefault(raw.id, raw)
+            elif not set(raw.symbols) <= set(prev.symbols):  # known article: only add newly attributed listings
+                self._items[raw.id] = prev.model_copy(update={"symbols": sorted({*prev.symbols, *raw.symbols})})
+        # Sentiment + tagging is CPU work; keep it off the event loop so health checks stay responsive.
+        enriched = await asyncio.to_thread(lambda: [self._enrich(i) for i in fresh.values()])
+        self._items.update((i.id, i) for i in enriched)
         if len(self._items) > self._max:
             keep = sorted(self._items.values(), key=lambda i: i.published, reverse=True)[: self._max]
             self._items = {i.id: i for i in keep}
-        return added
+        return len(enriched)
 
     async def run(self, interval_seconds: float) -> None:
         while True:
