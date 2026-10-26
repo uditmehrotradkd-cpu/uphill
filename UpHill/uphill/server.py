@@ -24,8 +24,10 @@ from redis.asyncio import Redis
 
 from quantterm.agent.market_agent import AgentContext, OpenAICompatibleClient
 from quantterm.connectors.http import HttpFetcher
+from quantterm.connectors.prices import NseBhavcopySource
 from quantterm.connectors.upstox import load_upstox_instruments
 from quantterm.db.pool import create_pool
+from quantterm.db.repositories import PriceRepository, SecurityRepository
 from quantterm.live import build_pipeline, parse_listing, start_live_feeds
 from quantterm.models import Exchange, Market
 from quantterm.pubsub import RedisBroker
@@ -35,6 +37,7 @@ from quantterm.workspace import Workspace
 from uphill.agent import routes as agent_routes
 from uphill.agent.stock_agent import UpHillStockAgent
 from uphill.market import routes as market_routes
+from uphill.market.eod import EodUpdater
 from uphill.market.screener import Screener
 from uphill.market.universe import load_universe
 from uphill.market.universe import news_aliases as universe_aliases
@@ -149,6 +152,11 @@ async def _runtime(app: FastAPI, settings: Settings, uphill: UpHillSettings) -> 
                             agent_enabled=enabled, clock=workspace.clock, screener=screener)
         tasks = [asyncio.create_task(news.run(uphill.news_refresh_seconds)),
                  asyncio.create_task(screener.run(uphill.screener_refresh_seconds))]
+        if uphill.eod_update:
+            state.eod = EodUpdater(pool, PriceRepository(pool, SecurityRepository(pool)),
+                                   NseBhavcopySource(HttpFetcher(client, rate_per_second=1)),
+                                   on_update=screener.refresh)
+            tasks.append(asyncio.create_task(state.eod.run(uphill.eod_check_seconds)))
         pipeline = None
         if uphill.live_feed:
             pipeline = build_pipeline(settings, pool, broker)

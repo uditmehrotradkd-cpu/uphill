@@ -48,6 +48,9 @@ services:
       # Free plan has 0.1 CPU: refresh the 54-source desk less often than the 120 s default.
       - key: UPHILL_NEWS_REFRESH_SECONDS
         value: "300"
+      # Stream only the watchlist live; 496 streaming stocks would starve the 0.1 CPU free instance.
+      - key: UPHILL_LIVE_UNIVERSE
+        value: "false"
 
   - type: keyvalue
     name: uphill-redis

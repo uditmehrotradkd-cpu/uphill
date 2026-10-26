@@ -106,6 +106,9 @@ class UpHillSettings(BaseSettings):
     # Stream every large/mid/small-cap stock in the universe (Upstox full mode allows up to 2000 instruments).
     live_universe: bool = True
     screener_refresh_seconds: int = Field(default=900, ge=60)
+    # Load each trading day's NSE bhavcopy into raw_market_bars (catches up missed sessions on start).
+    eod_update: bool = True
+    eod_check_seconds: int = Field(default=1800, ge=300)
     max_sessions: int = Field(default=200, ge=1)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"])
 

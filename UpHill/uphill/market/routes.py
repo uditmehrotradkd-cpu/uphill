@@ -94,6 +94,8 @@ async def market_status(state: State) -> dict[str, Any]:
         "watchlist": [f"{e.value}:{s}" for e, s in state.watchlist],
         "agent_enabled": state.agent_enabled,
         "news_updated": state.news.updated,
+        "eod_last_session": state.eod.last_session if state.eod else None,
+        "eod_checked": state.eod.checked if state.eod else None,
         "server_time": state.clock(),
     }
 

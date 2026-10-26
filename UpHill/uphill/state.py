@@ -17,6 +17,7 @@ from quantterm.models import Exchange
 from quantterm.pubsub import Broker
 from quantterm.settings import Settings
 from quantterm.terminal.command_router import CommandRouter, WorkspaceLike
+from uphill.market.eod import EodUpdater
 from uphill.market.screener import Screener
 from uphill.news.service import NewsService
 from uphill.settings import UpHillSettings
@@ -67,6 +68,7 @@ class UpHillState:
     clock: Callable[[], datetime] = lambda: datetime.now(UTC)
     snapshots: dict[str, tuple[float, dict[str, Any]]] = field(default_factory=dict)  # listing -> (monotonic, row)
     screener: Screener | None = None
+    eod: EodUpdater | None = None
 
 
 def get_state(request: Request) -> UpHillState:

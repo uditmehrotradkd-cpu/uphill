@@ -1,0 +1,17 @@
+name: Wake UpHill backend
+
+# Render's free web service sleeps after 15 idle minutes. Waking it lets the in-process EOD updater load
+# NSE's daily bhavcopy after the close, and keeps the live feed running through market hours.
+on:
+  schedule:
+    - cron: "*/10 3-10 * * 1-5"    # every 10 min, 08:30-16:30 IST, Mon-Fri
+    - cron: "15,45 13,14 * * 1-5"  # 18:45-20:15 IST, after the bhavcopy is published
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping health endpoint
+        run: curl -fsS -m 120 --retry 3 --retry-delay 20 https://uphill-api.onrender.com/api/health
