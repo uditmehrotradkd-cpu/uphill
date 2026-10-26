@@ -17,7 +17,7 @@ _LISTING_RE = re.compile(LISTING)
 @router.get("", response_model=list[NewsItem])
 async def news(
     state: State,
-    category: Annotated[str | None, Query(pattern=r"^(stock|markets|business|world)$")] = None,
+    category: Annotated[str | None, Query(pattern=r"^(stock|markets|business|india|world)$")] = None,
     symbol: Annotated[str | None, Query(pattern=LISTING)] = None,
     q: Annotated[str | None, Query(max_length=80)] = None,
     sentiment: Annotated[str | None, Query(pattern=r"^(bullish|bearish|neutral)$")] = None,

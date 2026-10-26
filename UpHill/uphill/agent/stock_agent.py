@@ -91,7 +91,9 @@ class UpHillStockAgent(MarketAgent):
                 "stock_headlines": _headlines(self._news.latest(symbol=listing, limit=15)),
                 "world_headlines": _headlines(self._news.latest(category="world", limit=8)),
                 "market_headlines": _headlines(self._news.latest(category="markets", limit=8)),
-                "news_basis": "live news desk (Upstox, GDELT, 18 RSS feeds, on-demand Google News search for this "
+                "india_headlines": _headlines(self._news.latest(category="india", limit=5)),
+                "news_basis": "live news desk (~55 publishers incl. Economic Times, Hindustan Times, Aaj Tak, BBC, "
+                              "CNN, WSJ, GDELT, Upstox; plus on-demand Google News search for this "
                               "company); not point-in-time",
             }
             return ToolOutput(context=ctx, facts=facts)

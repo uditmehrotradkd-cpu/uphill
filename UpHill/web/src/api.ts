@@ -138,7 +138,7 @@ export interface NewsItem {
   image: string | null;
   source: string;
   publisher: string;
-  category: "stock" | "markets" | "business" | "world";
+  category: "stock" | "markets" | "business" | "india" | "world";
   published: string;
   symbols: string[];
   sentiment: number;

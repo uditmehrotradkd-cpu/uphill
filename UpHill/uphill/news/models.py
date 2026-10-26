@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-Category = Literal["stock", "markets", "business", "world"]
+Category = Literal["stock", "markets", "business", "india", "world"]
 SentimentLabel = Literal["bullish", "bearish", "neutral"]
 
 

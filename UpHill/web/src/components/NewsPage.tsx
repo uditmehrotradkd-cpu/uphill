@@ -9,6 +9,7 @@ const CATEGORIES = [
   { key: "mine", label: "My Stocks" },
   { key: "markets", label: "Markets" },
   { key: "business", label: "Business" },
+  { key: "india", label: "India" },
   { key: "world", label: "World" },
 ];
 const SENTIMENTS = ["", "bullish", "bearish", "neutral"];
