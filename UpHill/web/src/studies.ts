@@ -29,7 +29,8 @@ export const STUDY_INFO: Record<StudyKind, { label: string; pane: boolean; perio
   ATR: { label: "Average true range", pane: true, period: 14 },
 };
 
-export const PALETTE = ["#d4b26a", "#c8c8ce", "#6aa9d4", "#b58ad8", "#4cc38a", "#e3a04a", "#e5675b", "#7fd1c7"];
+// Never gold (the price colour) or the candle up/down colours, so studies cannot be mistaken for price.
+export const PALETTE = ["#6aa9d4", "#b58ad8", "#e3a04a", "#7fd1c7", "#f28fb1", "#c8c8ce", "#9db4ff", "#e8e07a"];
 
 type Values = (number | null)[];
 

@@ -176,6 +176,7 @@ export interface AgentAnswer {
   cited: CitedFact[];
   context: string;
   language: AnswerLanguage;
+  general: boolean;
 }
 
 export interface LiveTick {

@@ -33,13 +33,10 @@ const SESSION_OPEN = 9 * 3600 + 15 * 60;
 const SESSION_CLOSE = 15 * 3600 + 30 * 60;
 const INTRADAY_REFRESH_MS = 20_000;
 const DAY_REFRESH_MS = 60_000;
-const STUDIES_KEY = "uphill.chart.studies";
+const STUDIES_KEY = "uphill.chart.studies.v2";
 const TYPE_KEY = "uphill.chart.type";
-const DEFAULT_STUDIES: Study[] = [
-  { id: "sma20", kind: "SMA", period: 20, color: PALETTE[0] },
-  { id: "sma50", kind: "SMA", period: 50, color: PALETTE[2] },
-  { id: "rsi14", kind: "RSI", period: 14, color: PALETTE[0] },
-];
+const PRICE = "#d4b26a";
+const DEFAULT_STUDIES: Study[] = [{ id: "rsi14", kind: "RSI", period: 14, color: PALETTE[0] }];
 
 function loadStudies(): Study[] {
   try {
@@ -214,20 +211,17 @@ export function PriceChart({ view }: { view: GPView }) {
       studies: [],
     };
     main.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    if (chartType === "candles") {
-      h.candles = main.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
-                                              wickUpColor: UP, wickDownColor: DOWN });
-    } else {
-      h.area = main.addAreaSeries({ lineColor: "#d4b26a", topColor: "#d4b26a40", bottomColor: "#d4b26a05", lineWidth: 2 });
-    }
     main.priceScale("right").applyOptions({ scaleMargins: { top: 0.08, bottom: 0.22 } });
-    const lineOptions = (color: string) => ({ color, lineWidth: 1 as const, priceLineVisible: false, lastValueVisible: false,
-                                              crosshairMarkerVisible: false });
+    // Overlays are thin, translucent and added before the price series, so candles stay on top.
+    const lineOptions = (color: string, overlay = false) => ({
+      color: overlay && color.length === 7 ? `${color}b3` : color, lineWidth: 1 as const, priceLineVisible: false,
+      lastValueVisible: false, crosshairMarkerVisible: false,
+    });
     for (const study of studies) {
       const info = STUDY_INFO[study.kind];
       const lines = computeStudy(study, [], intraday).lines;
       if (!info.pane) {
-        h.studies.push({ study, series: lines.map((l) => main.addLineSeries(lineOptions(l.color))) });
+        h.studies.push({ study, series: lines.map((l) => main.addLineSeries(lineOptions(l.color, true))) });
         continue;
       }
       const index = panes.indexOf(study);
@@ -246,6 +240,12 @@ export function PriceChart({ view }: { view: GPView }) {
                                                     lineWidth: 1, axisLabelVisible: false, title: "" }),
       );
       h.studies.push({ study, series });
+    }
+    if (chartType === "candles") {
+      h.candles = main.addCandlestickSeries({ upColor: UP, downColor: DOWN, borderUpColor: UP, borderDownColor: DOWN,
+                                              wickUpColor: UP, wickDownColor: DOWN });
+    } else {
+      h.area = main.addAreaSeries({ lineColor: PRICE, topColor: `${PRICE}40`, bottomColor: `${PRICE}05`, lineWidth: 2 });
     }
 
     let syncing = false;

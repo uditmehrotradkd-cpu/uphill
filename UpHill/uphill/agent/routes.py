@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from quantterm.workspace import format_value
-from uphill.agent.stock_agent import Language, UpHillStockAgent
+from uphill.agent.stock_agent import Language, UpHillStockAgent, is_general
 from uphill.state import CurrentSession, State
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -37,6 +37,7 @@ class AskResponse(BaseModel):
     cited: list[CitedFact]
     context: str
     language: Language
+    general: bool  # general knowledge / small talk / site help: not engine-verified market data
 
 
 @router.get("/status")
@@ -57,7 +58,7 @@ async def ask(body: AskRequest, state: State, session: CurrentSession) -> AskRes
         context = session.router.context
     return AskResponse(
         text=answer.text, fallback=answer.fallback, steps=answer.steps, tool_calls=answer.tool_calls, context=context,
-        language=body.language,
+        language=body.language, general=not answer.fallback and is_general(answer.raw),
         cited=[CitedFact(id=f.id, label=f.datum.label, display=format_value(f.datum), source=f.datum.source,
                          confidence=f.datum.confidence_score, timestamp=f.datum.timestamp, note=f.datum.note)
                for f in answer.cited],

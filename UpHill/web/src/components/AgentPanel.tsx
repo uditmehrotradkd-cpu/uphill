@@ -13,10 +13,13 @@ interface Props {
 
 const TEXT = {
   en: {
-    placeholder: "Ask about a stock, the market or the news…",
+    placeholder: "Ask me anything: a stock, the markets, world news, this site…",
     ask: "Ask",
     newChat: "new chat",
-    intro: "Every number the agent cites comes from the engine with source, confidence and knowledge time; headlines come from the news desk.",
+    greet: ["Good morning", "Good afternoon", "Good evening"],
+    hello: "I'm your UpHill AI analyst. Ask me about any stock or the markets, what's happening in the world, how to use this site, or anything else on your mind.",
+    intro: "Market figures are verified: every number comes from the engine with source, confidence and time.",
+    general: "General knowledge · not engine-verified",
     knows: "It knows the active security",
     listen: "Listen",
     stop: "Stop",
@@ -34,10 +37,13 @@ const TEXT = {
     facts: "facts cited",
   },
   hi: {
-    placeholder: "किसी शेयर, बाज़ार या ख़बर के बारे में पूछें…",
+    placeholder: "कुछ भी पूछें: शेयर, बाज़ार, दुनिया की ख़बरें, यह साइट…",
     ask: "पूछें",
     newChat: "नई चैट",
-    intro: "एजेंट जो भी आंकड़ा बताता है वह इंजन से स्रोत, भरोसे और समय के साथ आता है; सुर्ख़ियाँ न्यूज़ डेस्क से आती हैं।",
+    greet: ["सुप्रभात", "नमस्ते", "शुभ संध्या"],
+    hello: "मैं आपका UpHill AI विश्लेषक हूँ। किसी भी शेयर या बाज़ार, दुनिया की ख़बरों, इस साइट के इस्तेमाल — या किसी भी विषय पर पूछें।",
+    intro: "बाज़ार के आंकड़े सत्यापित हैं: हर संख्या इंजन से स्रोत, भरोसे और समय के साथ आती है।",
+    general: "सामान्य जानकारी · इंजन से सत्यापित नहीं",
     knows: "इसे सक्रिय शेयर पता है",
     listen: "सुनें",
     stop: "रोकें",
@@ -59,12 +65,18 @@ const TEXT = {
 function suggestions(lang: AnswerLanguage, symbol: string | undefined): string[] {
   if (lang === "hi") {
     return symbol
-      ? [`क्या ${symbol} खरीदना ठीक रहेगा? ट्रेंड, वैल्यूएशन और ख़बरें देखें।`, `${symbol} की ताज़ा ख़बरें क्या हैं?`, `${symbol} बाज़ार की तुलना में कितना अस्थिर है (बीटा)?`]
-      : ["RELIANCE IN और TCS IN के मोमेंटम की तुलना करें", "आज कौन सी वैश्विक ख़बरें भारतीय बाज़ार को प्रभावित कर सकती हैं?", "क्या INFY IN ओवरबॉट है?"];
+      ? [`क्या ${symbol} खरीदना ठीक रहेगा? ट्रेंड, वैल्यूएशन और ख़बरें देखें।`, `${symbol} की ताज़ा ख़बरें क्या हैं?`, "आज दुनिया में क्या हो रहा है?", "चार्ट पर RSI कैसे जोड़ें?"]
+      : ["नमस्ते! आप क्या-क्या कर सकते हैं?", "आज दुनिया में क्या हो रहा है?", "क्या INFY IN ओवरबॉट है?", "Analytics पेज कैसे इस्तेमाल करें?"];
   }
   return symbol
-    ? [`Should I consider buying ${symbol}? Weigh trend, valuation and news.`, `What is the latest news on ${symbol}?`, `How volatile is ${symbol} vs the market (beta)?`]
-    : ["Compare RELIANCE IN and TCS IN momentum", "What world news could move Indian markets today?", "Is INFY IN overbought?"];
+    ? [`Should I consider buying ${symbol}? Weigh trend, valuation and news.`, `What is the latest news on ${symbol}?`, "What's happening in the world today?", "How do I add RSI to the chart?"]
+    : ["Hi! What can you do?", "What's happening in the world today?", "Is INFY IN overbought?", "How do I use the Analytics page?"];
+}
+
+function greeting(lang: AnswerLanguage): string {
+  const hour = Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: false }));
+  const t = TEXT[lang];
+  return `${t.greet[hour < 12 ? 0 : hour < 17 ? 1 : 2]}! ${t.hello}`;
 }
 
 const SpeakerIcon = ({ on }: { on: boolean }) => (
@@ -163,9 +175,12 @@ export function AgentPanel({ enabled, activeListing, chat, voice, title = "AI ST
           </div>
         )}
         {enabled && messages.length === 0 && (
-          <div className="dim small">
-            {t.intro}
-            {symbol && <> {t.knows} (<b>{symbol}</b>).</>}
+          <div className="msg agent greeting" lang={lang}>
+            <div className="bubble">{greeting(lang)}</div>
+            <div className="meta">
+              {t.intro}
+              {symbol && <> {t.knows} (<b>{symbol}</b>).</>}
+            </div>
           </div>
         )}
         {messages.map((m) => (
@@ -179,7 +194,11 @@ export function AgentPanel({ enabled, activeListing, chat, voice, title = "AI ST
                   </button>
                 )}
                 {m.answer.fallback && <span className="warn">{TEXT[m.lang].withheld} · </span>}
-                {m.answer.steps} {TEXT[m.lang].steps} · tools: {m.answer.tool_calls.join(", ") || "none"} · {m.answer.cited.length} {TEXT[m.lang].facts}
+                {m.answer.general ? (
+                  <span className="general-tag">{TEXT[m.lang].general}</span>
+                ) : (
+                  <>{m.answer.steps} {TEXT[m.lang].steps} · tools: {m.answer.tool_calls.join(", ") || "none"} · {m.answer.cited.length} {TEXT[m.lang].facts}</>
+                )}
               </div>
             )}
           </div>

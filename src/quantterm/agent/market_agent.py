@@ -288,7 +288,7 @@ class Tool(BaseModel):
 
     name: str
     description: str
-    args: type[SecurityArgs]
+    args: type[BaseModel]
     run: Callable[[Any], Awaitable[ToolOutput]]
 
     def schema_for_llm(self) -> dict[str, Any]:
@@ -712,6 +712,12 @@ class MarketAgent:
         self.ledger.allow_text(sec, ctx.as_of.date().isoformat())
         return prompt
 
+    def _check(self, draft: str) -> GuardReport:
+        return check_grounding(draft, self.ledger)
+
+    def _render(self, draft: str) -> tuple[str, list[Fact]]:
+        return render_answer(draft, self.ledger)
+
     def _digest(self, facts: Sequence[Fact], reason: str) -> str:
         if not facts:
             return f"{reason}. No verified figures were retrieved; use GP, FA, RV or OVME in the terminal."
@@ -744,9 +750,9 @@ class MarketAgent:
                                      "content": await self.call_tool(c.name, c.arguments)})
                 continue
             draft = (reply.content or "").strip()
-            report = check_grounding(draft, self.ledger)
+            report = self._check(draft)
             if report.ok and draft:
-                text, cited = render_answer(draft, self.ledger)
+                text, cited = self._render(draft)
                 self._history.append((question, draft))
                 return AgentAnswer(text=text, raw=draft, cited=cited, grounded=True, fallback=False, steps=steps,
                                    tool_calls=calls, guard_failures=failures)

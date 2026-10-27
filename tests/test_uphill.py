@@ -317,9 +317,48 @@ def test_stock_agent_answers_in_requested_language() -> None:
     assert not hindi.fallback and hindi.text.startswith("RELIANCE के लिए")
     assert "answer in Hindi (Devanagari script)" in prompts[-1]
     asyncio.run(agent.ask("And now?", "en"))
-    assert "answer in English" in prompts[-1] and "Hindi" not in prompts[-1]
+    assert "answer in English" in prompts[-1] and "answer in Hindi" not in prompts[-1]
     withheld = asyncio.run(agent.ask("कितना गिरा?", "hi"))  # spelled Hindi quantity fails grounding 3x
     assert withheld.fallback and withheld.text.startswith("मॉडल का उत्तर सत्यापित नहीं हो सका")
+
+
+def test_stock_agent_handles_greetings_general_knowledge_and_world_news() -> None:
+    from quantterm.agent.market_agent import LLMReply
+    from uphill.agent.stock_agent import UpHillStockAgent, is_general
+
+    replies = iter([
+        "[GENERAL] Hello! I'm UpHill's AI analyst. How can I help?",
+        "[GENERAL] India became independent on 15 August 1947; Mount Everest is 8,849 m tall.",
+        "[GENERAL] Gold trades near $2,300 an ounce.", "[GENERAL] RELIANCE has an RSI of 45.",
+        "[GENERAL] Gold trades near 12% higher this year.",
+    ])
+    feedback: list[str] = []
+
+    class LLM:
+        async def complete(self, messages: Sequence[dict[str, Any]], tools: Sequence[dict[str, Any]]) -> LLMReply:
+            if messages[-1]["role"] == "user" and "CHECK FAILED" in str(messages[-1]["content"]):
+                feedback.append(str(messages[-1]["content"]))
+            return LLMReply(content=next(replies))
+
+    async def feed() -> list[NewsItem]:
+        return [_item("Oil jumps 3% as Gulf tensions rise", "https://a/oil", NOW - timedelta(hours=1))]
+
+    news = NewsService({"t": feed}, SymbolTagger({}), clock=lambda: NOW)
+    asyncio.run(news.refresh())
+    agent = UpHillStockAgent(_Workspace(), LLM(), news)  # type: ignore[arg-type]
+    hello = asyncio.run(agent.ask("hi"))
+    assert hello.text == "Hello! I'm UpHill's AI analyst. How can I help?" and is_general(hello.raw)
+    assert "everyday assistant" in agent._system_prompt() and "UpHill site guide" in agent._system_prompt()
+    facts = asyncio.run(agent.ask("When did India become independent?"))
+    assert not facts.fallback and "1947" in facts.text and "8,849 m" in facts.text
+    gold = asyncio.run(agent.ask("Gold price?"))  # money, market indicator and percentage typed from memory
+    assert gold.fallback and len(feedback) == 2
+    assert "GENERAL ANSWER CHECK FAILED" in feedback[0] and "$2,300" in feedback[0] and "45" in feedback[1]
+
+    payload = json.loads(asyncio.run(agent.call_tool("get_news", {"category": "all", "query": "oil"})))
+    assert "Oil jumps 3%" in payload["context"]["headlines"]
+    replies = iter(["[GENERAL] Oil jumped 3% on Gulf tensions, per the latest headlines."])
+    assert not asyncio.run(agent.ask("What's happening in the world?")).fallback  # headline numbers are quotable
 
 
 def test_market_websocket_forwards_validated_ticks(client: TestClient, broker: InMemoryBroker) -> None:
