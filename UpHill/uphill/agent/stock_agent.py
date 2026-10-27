@@ -8,11 +8,11 @@ low-confidence fact, which the system prompt requires the model to flag.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
-from quantterm.agent.market_agent import LLMClient, MarketAgent, SecurityArgs, Tool, ToolOutput
+from quantterm.agent.market_agent import AgentAnswer, Fact, LLMClient, MarketAgent, SecurityArgs, Tool, ToolOutput
 from quantterm.workspace import Datum, Workspace
 from uphill.news.models import NewsItem
 from uphill.news.service import NewsService
@@ -28,6 +28,25 @@ News and decision support:
 - For "should I buy/apply" questions, weigh price trend and momentum (get_price_history), valuation
   (get_relative_valuation) and news, list the main supporting and opposing considerations, and finish with
   "This is not investment advice." Never promise returns."""
+
+Language = Literal["en", "hi"]
+
+LANGUAGE_PROMPTS: dict[Language, str] = {
+    "en": """
+
+Language: answer in English. Answers may be read aloud, so prefer short, plain sentences and avoid tables.""",
+    "hi": """
+
+Language: answer in Hindi (Devanagari script), even if the question is in English or Hinglish. Answers are
+read aloud by a Hindi voice, so use short, simple, natural sentences and avoid tables and markdown.
+- Keep tickers, company names, exchange codes and {{F<n>}} placeholders exactly as written (Latin script).
+- The numeric grounding rules still apply in Hindi: never write numerals in any script (0-9 or ०-९) and
+  never spell quantities in words (e.g. "दस प्रतिशत", "दो सौ करोड़"); use the placeholders.
+- End buy/sell/avoid answers with "यह निवेश सलाह नहीं है।" instead of the English disclaimer.""",
+}
+HINDI_DIGEST = "मॉडल का उत्तर सत्यापित नहीं हो सका ({reason})."
+HINDI_FACTS = "इस प्रश्न के लिए प्राप्त सत्यापित आंकड़े:"
+HINDI_NO_FACTS = "कोई सत्यापित आंकड़ा नहीं मिला; टर्मिनल में GP, FA, RV या OVME देखें।"
 
 
 class NewsArgs(SecurityArgs):
@@ -63,7 +82,12 @@ def inline_refs(schema: dict[str, Any]) -> dict[str, Any]:
 class UpHillStockAgent(MarketAgent):
     def __init__(self, workspace: Workspace, llm: LLMClient, news: NewsService, **kwargs: Any) -> None:
         self._news = news  # read by _build_tools during MarketAgent.__init__
+        self.language: Language = "en"
         super().__init__(workspace, llm, **kwargs)
+
+    async def ask(self, question: str, language: Language = "en") -> AgentAnswer:
+        self.language = language
+        return await super().ask(question)
 
     def tool_schemas(self) -> list[dict[str, Any]]:
         schemas = super().tool_schemas()
@@ -72,7 +96,16 @@ class UpHillStockAgent(MarketAgent):
         return schemas
 
     def _system_prompt(self) -> str:
-        return super()._system_prompt() + NEWS_PROMPT
+        return super()._system_prompt() + NEWS_PROMPT + LANGUAGE_PROMPTS[self.language]
+
+    def _digest(self, facts: Sequence[Fact], reason: str) -> str:
+        if self.language != "hi":
+            return super()._digest(facts, reason)
+        head = HINDI_DIGEST.format(reason=reason)
+        if not facts:
+            return f"{head} {HINDI_NO_FACTS}"
+        lines = "\n".join(f"- {f.datum.label}: {{{{{f.id}}}}}" for f in facts)
+        return f"{head} {HINDI_FACTS}\n{lines}"
 
     def _build_tools(self) -> list[Tool]:
         tools = super()._build_tools()

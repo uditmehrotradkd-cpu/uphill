@@ -166,6 +166,8 @@ export interface CitedFact {
   note: string | null;
 }
 
+export type AnswerLanguage = "en" | "hi";
+
 export interface AgentAnswer {
   text: string;
   fallback: boolean;
@@ -173,6 +175,7 @@ export interface AgentAnswer {
   tool_calls: string[];
   cited: CitedFact[];
   context: string;
+  language: AnswerLanguage;
 }
 
 export interface LiveTick {
@@ -270,8 +273,8 @@ export const api = {
     request<CandlesResponse>(`/api/market/candles${query({ symbol, interval })}`),
   command: (command: string) =>
     request<TerminalResult>("/api/terminal/command", { method: "POST", body: JSON.stringify({ command }) }),
-  ask: (question: string) =>
-    request<AgentAnswer>("/api/agent/ask", { method: "POST", body: JSON.stringify({ question }) }),
+  ask: (question: string, language: AnswerLanguage = "en") =>
+    request<AgentAnswer>("/api/agent/ask", { method: "POST", body: JSON.stringify({ question, language }) }),
   resetAgent: () => request<void>("/api/agent/reset", { method: "POST" }),
   news: (p: { category?: string; symbol?: string; q?: string; sentiment?: string; tagged?: string[]; limit?: number }) =>
     request<NewsItem[]>(`/api/news${query(p)}`),

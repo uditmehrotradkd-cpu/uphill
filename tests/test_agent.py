@@ -94,6 +94,9 @@ def test_guard_accepts_placeholders_and_label_numbers() -> None:
     ("Beta of {{F7}}", "unknown_facts", ["F7"]),
     ("Shares fell about twenty percent", "spelled_quantities", ["twenty percent"]),
     ("Margins expanded by two hundred basis points", "spelled_quantities", ["two hundred basis points"]),
+    ("शेयर लगभग दस प्रतिशत गिरा।", "spelled_quantities", ["दस प्रतिशत"]),
+    ("मुनाफा दो सौ करोड़ रहा", "spelled_quantities", ["दो सौ करोड़"]),
+    ("RSI १२ है", "uncited_numbers", ["१२"]),  # Devanagari numerals are digits too
 ])
 def test_guard_rejects_ungrounded_figures(text: str, field: str, expected: list[str]) -> None:
     report = check_grounding(text, _ledger_with(_datum("RSI(14)", 61.2)))

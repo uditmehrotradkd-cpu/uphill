@@ -65,7 +65,7 @@ export function NewsPage({ watchlist, onOpenSecurity }: Props) {
 
   return (
     <section className="news-page">
-      <PageHero index="03" label="World & market news" title="What's moving" accent="the world." outline="NEWS">
+      <PageHero index="04" label="World & market news" title="What's moving" accent="the world." outline="NEWS">
         <div className="intel-meter">
           <SentimentMeter bullish={counts.bullish} neutral={counts.neutral} bearish={counts.bearish} />
           <div className="meter-legend">

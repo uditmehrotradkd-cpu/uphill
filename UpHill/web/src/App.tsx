@@ -1,14 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MarketStatus, OverviewRow, api } from "./api";
 import { AgentPanel } from "./components/AgentPanel";
+import { AnalyticsPage } from "./components/AnalyticsPage";
 import { PageHero } from "./components/Editorial";
 import { NewsPage, NewsTicker } from "./components/NewsPage";
 import { ScreenerPage } from "./components/ScreenerPage";
 import { TerminalHandle, TerminalPanel } from "./components/TerminalPanel";
 import { Watchlist } from "./components/Watchlist";
+import { useAgentChat } from "./useAgentChat";
 import { useMarketStream } from "./useMarketStream";
+import { useVoice } from "./voice";
 
-type Tab = "dashboard" | "stocks" | "news";
+type Tab = "dashboard" | "analytics" | "stocks" | "news";
 const icon = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
     <path d={d} />
@@ -16,6 +19,7 @@ const icon = (d: string) => (
 );
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: "dashboard", label: "Dashboard", icon: icon("M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z") },
+  { key: "analytics", label: "Analytics", icon: icon("M4 20V10M10 20V4M16 20v-7M22 20H2M14.5 8.5l3-3 3 3") },
   { key: "stocks", label: "All Stocks", icon: icon("M3 20h18M5 16l4-5 4 3 6-8") },
   { key: "news", label: "News", icon: icon("M5 4h11v16H6a2 2 0 0 1-2-2V5a1 1 0 0 1 1-1zM16 8h3v10a2 2 0 0 1-2 2M8 8h5M8 12h5M8 16h3") },
 ];
@@ -54,6 +58,8 @@ export default function App() {
   const [backendError, setBackendError] = useState<string | null>(null);
   const terminal = useRef<TerminalHandle>(null);
   const { ticks, connection } = useMarketStream(watchlist);
+  const voice = useVoice();
+  const chat = useAgentChat(voice);
 
   useEffect(() => {
     api.status()
@@ -133,9 +139,20 @@ export default function App() {
             onRemove={(l) => updateWatch(l, "DEL")}
           />
           <TerminalPanel ref={terminal} onWatch={updateWatch} onSecurity={setActive} />
-          <AgentPanel enabled={status?.agent_enabled ?? false} activeListing={active} />
+          <AgentPanel enabled={status?.agent_enabled ?? false} activeListing={active} chat={chat} voice={voice} />
         </div>
       </main>
+      {tab === "analytics" && (
+        <AnalyticsPage
+          agentEnabled={status?.agent_enabled ?? false}
+          initialListing={active}
+          watchlist={watchlist}
+          chat={chat}
+          voice={voice}
+          onSecurity={setActive}
+          onWatch={updateWatch}
+        />
+      )}
       {tab === "stocks" && <ScreenerPage watchlist={watchlist} onOpenSecurity={openSecurity} onWatch={updateWatch} />}
       {tab === "news" && <NewsPage watchlist={watchlist} onOpenSecurity={openSecurity} />}
 

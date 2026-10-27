@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import unicodedata
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import date, datetime, time
 from time import monotonic
@@ -60,6 +61,17 @@ _SPELLED_QUANTITY = re.compile(
     r"(?:percent|per\s+cent|percentage\s+points?|basis\s+points?|bps|million|billion|trillion|crores?|lakhs?|"
     r"times|x|dollars?|rupees?)\b",
     re.IGNORECASE,
+)
+_HINDI_NUMBERS = (
+    r"एक|दो|तीन|चार|पांच|पाँच|छह|छः|सात|आठ|नौ|दस|ग्यारह|बारह|पंद्रह|बीस|पच्चीस|तीस|चालीस|पचास|साठ|सत्तर|अस्सी|नब्बे|सौ|"
+    r"हज़ार|हजार|आधा|आधे|डेढ़|ढाई|दोगुना|तिगुना"
+)
+# Devanagari vowel signs are not \w, so \b is unreliable: delimit Hindi words by whitespace/punctuation.
+# Matched against NFC text, where nukta letters (ज़ ड़ फ़) are always decomposed.
+_HINDI_SPELLED_QUANTITY = re.compile(
+    rf"(?<!\S)(?:{_HINDI_NUMBERS})(?:[\s-]+(?:{_HINDI_NUMBERS}))*[\s-]+"
+    r"(?:प्रतिशत|फ़ीसदी|फीसदी|फीसद|गुना|गुणा|रुपये|रुपए|रुपया|डॉलर|करोड़|लाख|अरब|हज़ार|हजार|अंक|बेसिस पॉइंट)"
+    r"(?=$|[\s।,.!?;:)])",
 )
 FACT_PROMPT_LIMIT = 120  # facts per tool result shown to the model
 
@@ -187,6 +199,7 @@ def check_grounding(text: str, ledger: FactLedger) -> GuardReport:
         if norm not in allowed and tok not in uncited:
             uncited.append(tok)
     spelled = [m.group(0) for m in _SPELLED_QUANTITY.finditer(stripped)]
+    spelled += [m.group(0) for m in _HINDI_SPELLED_QUANTITY.finditer(unicodedata.normalize("NFC", stripped))]
     return GuardReport(cited=list(dict.fromkeys(cited)), unknown_facts=unknown, uncited_numbers=uncited,
                        spelled_quantities=spelled)
 

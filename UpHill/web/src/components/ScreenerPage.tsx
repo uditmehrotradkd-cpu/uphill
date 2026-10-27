@@ -51,14 +51,14 @@ interface Props {
   onWatch: (listing: string, action: "ADD" | "DEL") => void;
 }
 
-function volume(v: number | null | undefined): string {
+export function volume(v: number | null | undefined): string {
   if (v == null) return "n/a";
   if (v >= 1e7) return `${(v / 1e7).toFixed(2)} Cr`;
   if (v >= 1e5) return `${(v / 1e5).toFixed(2)} L`;
   return v.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 }
 
-function RangeBar({ low, high, value }: { low?: number | null; high?: number | null; value: number | null }) {
+export function RangeBar({ low, high, value }: { low?: number | null; high?: number | null; value: number | null }) {
   if (low == null || high == null || value == null || high <= low) return <span className="dim">n/a</span>;
   const pos = Math.max(0, Math.min(1, (value - low) / (high - low)));
   return (
@@ -143,7 +143,7 @@ export function ScreenerPage({ watchlist, onOpenSecurity, onWatch }: Props) {
 
   return (
     <section className="screener">
-      <PageHero index="02" label="All stocks" title="Every stock," accent="ranked." outline="NIFTY">
+      <PageHero index="03" label="All stocks" title="Every stock," accent="ranked." outline="NIFTY">
         <p className="dim">{rows.length} NSE listings across large, mid and small caps. Sort, filter, open any of them in the terminal.</p>
       </PageHero>
       <div className="screener-head">

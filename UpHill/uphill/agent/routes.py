@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from quantterm.workspace import format_value
+from uphill.agent.stock_agent import Language, UpHillStockAgent
 from uphill.state import CurrentSession, State
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -15,6 +16,7 @@ class AskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     question: str = Field(min_length=1, max_length=1000)
+    language: Language = "en"
 
 
 class CitedFact(BaseModel):
@@ -34,6 +36,7 @@ class AskResponse(BaseModel):
     tool_calls: list[str]
     cited: list[CitedFact]
     context: str
+    language: Language
 
 
 @router.get("/status")
@@ -47,10 +50,14 @@ async def ask(body: AskRequest, state: State, session: CurrentSession) -> AskRes
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE,
                             "agent disabled: set QT_AGENT_API_KEY (Gemini key) in .env and restart UpHill")
     async with session.lock:
-        answer = await session.agent.ask(body.question.strip())
+        if isinstance(session.agent, UpHillStockAgent):
+            answer = await session.agent.ask(body.question.strip(), body.language)
+        else:
+            answer = await session.agent.ask(body.question.strip())
         context = session.router.context
     return AskResponse(
         text=answer.text, fallback=answer.fallback, steps=answer.steps, tool_calls=answer.tool_calls, context=context,
+        language=body.language,
         cited=[CitedFact(id=f.id, label=f.datum.label, display=format_value(f.datum), source=f.datum.source,
                          confidence=f.datum.confidence_score, timestamp=f.datum.timestamp, note=f.datum.note)
                for f in answer.cited],

@@ -292,6 +292,34 @@ def test_candles_endpoint_aggregates_day_and_validates(client: TestClient) -> No
 def test_agent_disabled_is_reported(client: TestClient) -> None:
     r = client.post("/api/agent/ask", json={"question": "Should I buy INFY?"}, headers=SID)
     assert r.status_code == 503 and "QT_AGENT_API_KEY" in r.json()["detail"]
+    hindi = client.post("/api/agent/ask", json={"question": "INFY?", "language": "hi"}, headers=SID)
+    assert hindi.status_code == 503
+    bad = client.post("/api/agent/ask", json={"question": "INFY?", "language": "fr"}, headers=SID)
+    assert bad.status_code == 422
+
+
+def test_stock_agent_answers_in_requested_language() -> None:
+    from quantterm.agent.market_agent import LLMReply
+    from uphill.agent.stock_agent import UpHillStockAgent
+
+    prompts: list[str] = []
+    replies = iter(["RELIANCE के लिए अभी कोई आंकड़ा नहीं है।", "No figures yet.",
+                    *["शेयर दस प्रतिशत गिरा।"] * 3])
+
+    class LLM:
+        async def complete(self, messages: Sequence[dict[str, Any]], tools: Sequence[dict[str, Any]]) -> LLMReply:
+            prompts.append(messages[0]["content"])
+            return LLMReply(content=next(replies))
+
+    news = NewsService({}, SymbolTagger({}), clock=lambda: NOW)
+    agent = UpHillStockAgent(_Workspace(), LLM(), news)  # type: ignore[arg-type]
+    hindi = asyncio.run(agent.ask("Is RELIANCE a buy?", "hi"))
+    assert not hindi.fallback and hindi.text.startswith("RELIANCE के लिए")
+    assert "answer in Hindi (Devanagari script)" in prompts[-1]
+    asyncio.run(agent.ask("And now?", "en"))
+    assert "answer in English" in prompts[-1] and "Hindi" not in prompts[-1]
+    withheld = asyncio.run(agent.ask("कितना गिरा?", "hi"))  # spelled Hindi quantity fails grounding 3x
+    assert withheld.fallback and withheld.text.startswith("मॉडल का उत्तर सत्यापित नहीं हो सका")
 
 
 def test_market_websocket_forwards_validated_ticks(client: TestClient, broker: InMemoryBroker) -> None:
