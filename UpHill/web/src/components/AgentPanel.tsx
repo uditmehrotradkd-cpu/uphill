@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { AnswerLanguage } from "../api";
 import { AgentChat } from "../useAgentChat";
 import { Voice } from "../voice";
@@ -71,6 +71,40 @@ function suggestions(lang: AnswerLanguage, symbol: string | undefined): string[]
   return symbol
     ? [`Should I consider buying ${symbol}? Weigh trend, valuation and news.`, `What is the latest news on ${symbol}?`, "What's happening in the world today?", "How do I add RSI to the chart?"]
     : ["Hi! What can you do?", "What's happening in the world today?", "Is INFY IN overbought?", "How do I use the Analytics page?"];
+}
+
+function inline(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    part.length > 4 && part.startsWith("**") && part.endsWith("**") ? <strong key={i}>{part.slice(2, -2)}</strong> : part,
+  );
+}
+
+/** Light markdown (bold, bullet and numbered lists) built as React elements, never as raw HTML. */
+function RichText({ text }: { text: string }) {
+  const blocks: ReactNode[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  const flush = () => {
+    if (!list) return;
+    const items = list.items.map((item, i) => <li key={i}>{inline(item)}</li>);
+    blocks.push(list.ordered ? <ol key={blocks.length}>{items}</ol> : <ul key={blocks.length}>{items}</ul>);
+    list = null;
+  };
+  for (const line of text.split("\n")) {
+    const item = line.match(/^\s*(?:[-*•]|(\d+)[.)])\s+(.*)$/);
+    if (item) {
+      const ordered = item[1] !== undefined;
+      if (!list || list.ordered !== ordered) {
+        flush();
+        list = { ordered, items: [] };
+      }
+      list.items.push(item[2]);
+      continue;
+    }
+    flush();
+    if (line.trim()) blocks.push(<p key={blocks.length}>{inline(line.replace(/^#{1,4}\s+/, ""))}</p>);
+  }
+  flush();
+  return <>{blocks}</>;
 }
 
 function greeting(lang: AnswerLanguage): string {
@@ -185,7 +219,7 @@ export function AgentPanel({ enabled, activeListing, chat, voice, title = "AI ST
         )}
         {messages.map((m) => (
           <div key={m.id} className={`msg ${m.role}`} lang={m.lang}>
-            <div className="bubble">{m.text}</div>
+            <div className={`bubble ${m.role === "agent" ? "rich" : ""}`}>{m.role === "agent" ? <RichText text={m.text} /> : m.text}</div>
             {m.answer && (
               <div className="meta">
                 {voice.canSpeak(m.lang) && (

@@ -139,12 +139,12 @@ export default function App() {
             onRemove={(l) => updateWatch(l, "DEL")}
           />
           <TerminalPanel ref={terminal} onWatch={updateWatch} onSecurity={setActive} />
-          <AgentPanel enabled={status?.agent_enabled ?? false} activeListing={active} chat={chat} voice={voice} />
+          <AgentPanel enabled={status?.agent_enabled ?? !backendError} activeListing={active} chat={chat} voice={voice} />
         </div>
       </main>
       {tab === "analytics" && (
         <AnalyticsPage
-          agentEnabled={status?.agent_enabled ?? false}
+          agentEnabled={status?.agent_enabled ?? !backendError}
           initialListing={active}
           watchlist={watchlist}
           chat={chat}

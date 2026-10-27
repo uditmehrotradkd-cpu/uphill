@@ -400,6 +400,12 @@ table.chain td.strike { font-weight: 700; text-align: center; color: var(--ink);
 }
 .speak-btn svg { width: 13px; height: 13px; }
 .general-tag { color: var(--silver); font-style: italic; }
+.bubble.rich { white-space: normal; }
+.bubble.rich p { margin: 0 0 8px; }
+.bubble.rich p:last-child, .bubble.rich ul:last-child, .bubble.rich ol:last-child { margin-bottom: 0; }
+.bubble.rich ul, .bubble.rich ol { margin: 0 0 8px; padding-left: 20px; }
+.bubble.rich li { margin: 3px 0; }
+.bubble.rich strong { color: var(--ink); font-weight: 650; }
 .msg.greeting .bubble { background: linear-gradient(180deg, rgba(212, 178, 106, 0.1), rgba(212, 178, 106, 0.03)); border-color: var(--gold-line); color: var(--ink); }
 .msg.greeting .meta { font-family: var(--sans); line-height: 1.5; }
 [lang="hi"] .bubble, .bubble[lang="hi"] { font-family: var(--sans), "Nirmala UI", "Noto Sans Devanagari", "Mangal", sans-serif; font-size: 14.5px; }
