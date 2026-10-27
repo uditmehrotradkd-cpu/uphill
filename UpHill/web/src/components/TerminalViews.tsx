@@ -1,6 +1,6 @@
 import { Datum, FAView, GPView, OVMEView, OptionValuation, QuotedLeg, RVView } from "../api";
 import { fmt } from "../format";
-import { Chart, Series } from "./Chart";
+import { PriceChart } from "./PriceChart";
 
 const LOW_CONFIDENCE = 0.8;
 const WARN_CONFIDENCE = 0.5;
@@ -43,14 +43,6 @@ function ProvenanceTable({ rows }: { rows: Datum[] }) {
 }
 
 export function GPPanel({ v }: { v: GPView }) {
-  const pts = (values: (number | null)[]) => v.dates.map((time, i) => ({ time, value: values[i] }));
-  const price: Series[] = [{ name: "Close", kind: "area", color: "#d4b26a", points: pts(v.close) }];
-  const volume: Series[] = [{ name: "Volume", kind: "histogram", color: "#4a4538", points: pts(v.volume) }];
-  const rsi: Series[] = [{ name: "RSI", kind: "line", color: "#d4b26a", points: pts(v.rsi) }];
-  const macd: Series[] = [
-    { name: "MACD", kind: "line", color: "#d4b26a", points: pts(v.macd) },
-    { name: "Signal", kind: "line", color: "#c8c8ce", points: pts(v.signal) },
-  ];
   const basis = v.adjust_dividends ? "split + dividend adjusted" : v.adjust_splits ? "split adjusted" : "raw";
   return (
     <div className="view">
@@ -62,14 +54,7 @@ export function GPPanel({ v }: { v: GPView }) {
           </span>
         ))}
       </div>
-      <h4>Close ({v.security.currency})</h4>
-      <Chart series={price} height={240} />
-      <h4>Volume</h4>
-      <Chart series={volume} height={80} />
-      <div className="two">
-        <div><h4>RSI(14)</h4><Chart series={rsi} height={110} levels={[30, 70]} /></div>
-        <div><h4>MACD(12,26,9)</h4><Chart series={macd} height={110} levels={[0]} /></div>
-      </div>
+      <PriceChart view={v} />
     </div>
   );
 }

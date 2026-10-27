@@ -4,9 +4,9 @@ import asyncio
 import json
 import logging
 import time
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 
 from quantterm.live import parse_listing
 from quantterm.models import Exchange
@@ -21,6 +21,7 @@ router = APIRouter(tags=["market"])
 MAX_SYMBOLS = 50
 MAX_STREAM_SYMBOLS = 600  # the all-stocks screener streams a whole cap bucket
 SNAPSHOT_TTL_SECONDS = 60.0
+CandleInterval = Literal["1", "3", "5", "15", "30", "60", "day"]
 
 
 def _listings(refs: list[str] | None, state: UpHillState, limit: int = MAX_SYMBOLS) -> list[tuple[Exchange, str]]:
@@ -91,6 +92,29 @@ async def screener(state: State) -> dict[str, Any]:
         "rows": [r | {"live": r["listing"] in live, "news": pulses[r["listing"]].model_dump(mode="json")}
                  for r in rows],
     }
+
+
+@router.get("/api/market/candles")
+async def candles(state: State, symbol: str, interval: CandleInterval = "5") -> dict[str, Any]:
+    """Today's live candles [epoch s, o, h, l, c, v] (oldest first); "day" = the running session candle."""
+    if state.quotes is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "live quotes are not configured")
+    try:
+        exchange, sym = parse_listing(symbol.upper())
+    except ValueError:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "symbol must look like NSE:RELIANCE") from None
+    try:
+        rows = (await state.quotes.intraday(sym, 30 if interval == "day" else int(interval))
+                if exchange is Exchange.NSE else None)
+    except Exception as exc:
+        log.warning("intraday candles %s failed: %s", sym, exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "intraday candles unavailable") from None
+    if rows is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"no live data for {symbol}")
+    if interval == "day" and rows:
+        rows = [(rows[0][0], rows[0][1], max(r[2] for r in rows), min(r[3] for r in rows), rows[-1][4],
+                 sum(r[5] for r in rows))]
+    return {"listing": f"{exchange.value}:{sym}", "interval": interval, "candles": rows}
 
 
 @router.get("/api/market/status")

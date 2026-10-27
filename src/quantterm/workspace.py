@@ -171,6 +171,9 @@ class GPView(BaseModel):
     macd: list[float | None]
     signal: list[float | None]
     summary: list[Datum]
+    open: list[float] = Field(default_factory=list)
+    high: list[float] = Field(default_factory=list)
+    low: list[float] = Field(default_factory=list)
 
 
 class FARow(BaseModel):
@@ -349,6 +352,8 @@ class Workspace:
             dates=[bars["session_date"][i] for i in idx], close=[float(close[i]) for i in idx],
             volume=[float(bars["volume"][i]) for i in idx], rsi=[nan(r[i]) for i in idx],
             macd=[nan(m[i]) for i in idx], signal=[nan(s[i]) for i in idx], summary=summary,
+            open=[float(bars["open"][i]) for i in idx], high=[float(bars["high"][i]) for i in idx],
+            low=[float(bars["low"][i]) for i in idx],
         )
 
     # ------------------------------------------------------------------ fundamentals

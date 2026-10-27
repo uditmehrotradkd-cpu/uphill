@@ -313,6 +313,31 @@ button:disabled { opacity: 0.35; cursor: default; transform: none !important; bo
 .chip.strong { background: var(--gold-grad); color: var(--on-gold); border-color: transparent; font-weight: 650; box-shadow: var(--metal-shine); }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .chart { width: 100%; }
+.price-chart { margin-top: 10px; }
+.chart-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 999px; padding: 2px; gap: 2px; }
+.seg button {
+  background: transparent; border: none; color: var(--muted); font: 500 12px var(--mono); padding: 5px 11px; border-radius: 999px;
+  transition: background 0.3s var(--ease), color 0.3s var(--ease);
+}
+.seg button:hover { color: var(--gold-hi); }
+.seg button.on { background: var(--gold-grad); color: var(--on-gold); box-shadow: var(--metal-shine); }
+.study-add { display: flex; gap: 6px; margin-left: auto; }
+.study-add select, .study-add input { padding: 5px 12px; font: 500 12px var(--mono); }
+.study-add select { max-width: 210px; text-overflow: ellipsis; }
+.study-add input { width: 64px; }
+.study-add button {
+  background: var(--gold-soft); border: 1px solid var(--gold-line); color: var(--gold-hi); border-radius: 999px; padding: 5px 14px;
+  font: 600 12px var(--mono);
+}
+.chip.study { display: inline-flex; align-items: center; gap: 6px; font: 500 11.5px var(--mono); padding: 3px 6px 3px 10px; }
+.chip.study i { width: 8px; height: 8px; border-radius: 50%; }
+.chip.study .x { opacity: 0.6; font-size: 14px; }
+.chip.study .x:hover { opacity: 1; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); min-height: 18px; }
+.chart-legend b { color: var(--ink); font-weight: 500; }
+.chart-pane { border-top: 1px solid var(--line); margin-top: 2px; }
+.pane-label { font: 500 11.5px var(--mono); padding: 4px 0 0; }
 .scroll-x { overflow-x: auto; }
 table.grid { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 13px; }
 table.grid th, table.grid td { padding: 9px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }

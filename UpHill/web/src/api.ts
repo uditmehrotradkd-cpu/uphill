@@ -25,6 +25,9 @@ export interface GPView {
   adjust_splits: boolean;
   adjust_dividends: boolean;
   dates: string[];
+  open?: number[];
+  high?: number[];
+  low?: number[];
   close: number[];
   volume: number[];
   rsi: (number | null)[];
@@ -207,6 +210,14 @@ export interface ScreenerRow {
   news: NewsPulse;
 }
 
+export type CandleInterval = "1" | "3" | "5" | "15" | "30" | "60" | "day";
+
+export interface CandlesResponse {
+  listing: string;
+  interval: CandleInterval;
+  candles: [number, number, number, number, number, number][]; // epoch s, open, high, low, close, volume
+}
+
 function sessionId(): string {
   const key = "uphill.session";
   let id = localStorage.getItem(key);
@@ -255,6 +266,8 @@ export const api = {
   status: () => request<MarketStatus>("/api/market/status"),
   overview: (symbols: string[]) => request<OverviewRow[]>(`/api/market/overview${query({ symbols })}`),
   screener: () => request<{ updated: string | null; rows: ScreenerRow[] }>("/api/market/screener"),
+  candles: (symbol: string, interval: CandleInterval) =>
+    request<CandlesResponse>(`/api/market/candles${query({ symbol, interval })}`),
   command: (command: string) =>
     request<TerminalResult>("/api/terminal/command", { method: "POST", body: JSON.stringify({ command }) }),
   ask: (question: string) =>

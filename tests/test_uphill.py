@@ -266,6 +266,29 @@ def test_screener_endpoint_merges_live_flag_and_news(client: TestClient) -> None
     assert row["live"] is True and row["news"]["articles"] == 1 and body["updated"] is not None
 
 
+def test_candles_endpoint_aggregates_day_and_validates(client: TestClient) -> None:
+    state: UpHillState = client.app.state.uphill  # type: ignore[attr-defined]
+    assert client.get("/api/market/candles", params={"symbol": "NSE:INFY"}).status_code == 503
+
+    class Quotes:
+        calls: list[tuple[str, int]] = []
+
+        async def intraday(self, symbol: str, minutes: int) -> list[tuple[int, float, float, float, float, float]] | None:
+            self.calls.append((symbol, minutes))
+            if symbol != "INFY":
+                return None
+            return [(100, 10.0, 12.0, 9.0, 11.0, 5.0), (1900, 11.0, 13.0, 10.5, 12.5, 7.0)]
+
+    state.quotes = Quotes()  # type: ignore[assignment]
+    five = client.get("/api/market/candles", params={"symbol": "nse:infy", "interval": "5"}).json()
+    assert five["listing"] == "NSE:INFY" and len(five["candles"]) == 2
+    day = client.get("/api/market/candles", params={"symbol": "NSE:INFY", "interval": "day"}).json()
+    assert day["candles"] == [[100, 10.0, 13.0, 9.0, 12.5, 12.0]] and Quotes.calls[-1] == ("INFY", 30)
+    assert client.get("/api/market/candles", params={"symbol": "NSE:TCS"}).status_code == 404
+    assert client.get("/api/market/candles", params={"symbol": "NSE:INFY", "interval": "7"}).status_code == 422
+    assert client.get("/api/market/candles", params={"symbol": "../etc"}).status_code == 422
+
+
 def test_agent_disabled_is_reported(client: TestClient) -> None:
     r = client.post("/api/agent/ask", json={"question": "Should I buy INFY?"}, headers=SID)
     assert r.status_code == 503 and "QT_AGENT_API_KEY" in r.json()["detail"]
